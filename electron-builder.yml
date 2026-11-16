@@ -1,0 +1,20 @@
+# Windows installer settings (used from the packaging phase: npm run dist:win on Windows or GitHub Actions)
+appId: com.saravanan.hiremate
+productName: HireMate AI
+directories:
+  buildResources: resources
+  output: release/${version}
+files:
+  - out/**
+  - package.json
+asar: true
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  executableName: HireMate AI
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: HireMate AI

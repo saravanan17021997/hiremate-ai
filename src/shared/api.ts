@@ -1,0 +1,86 @@
+// The shape of window.hiremate, the API the preload script gives the UI.
+import type { IpcResult } from "./ipc";
+import type { JobDescription, PanelAction, PanelState, SessionRecord, Transcript, LiveConsent, LiveStart, AccountStatus, AiSettings, AnswerMode, AppInfo, AskResult, WorkspaceContextStatus, CandidateProfile, DashboardSummary, ProjectInput, ProjectList, ProviderId, ResumeImport, SavedProfile, SignUpResult, StreamEvent } from "./types";
+
+export interface HireMateApi {
+  app: {
+    getInfo(): Promise<IpcResult<AppInfo>>;
+    openExternal(url: string): Promise<IpcResult<boolean>>;
+  };
+  dashboard: {
+    getSummary(): Promise<IpcResult<DashboardSummary>>;
+  };
+  ai: {
+    getSettings(): Promise<IpcResult<AiSettings>>;
+    /** Tests the key with the provider first; it is saved (encrypted) only if the test passes. */
+    saveKey(provider: ProviderId, apiKey: string): Promise<IpcResult<AiSettings>>;
+    removeKey(provider: ProviderId): Promise<IpcResult<AiSettings>>;
+    setActive(provider: ProviderId, model: string): Promise<IpcResult<AiSettings>>;
+    /** Starts a short streamed test answer; pieces arrive through onStream. */
+    startTest(prompt: string): Promise<IpcResult<{ requestId: string }>>;
+    cancel(requestId: string): Promise<IpcResult<boolean>>;
+    onStream(listener: (event: StreamEvent) => void): () => void;
+  };
+  account: {
+    getStatus(): Promise<IpcResult<AccountStatus>>;
+    signUp(email: string, password: string): Promise<IpcResult<SignUpResult>>;
+    signIn(email: string, password: string): Promise<IpcResult<AccountStatus>>;
+    signOut(): Promise<IpcResult<AccountStatus>>;
+  };
+  resume: {
+    /** Opens a file picker, checks and reads the file, and asks the AI for a draft profile. null = cancelled. */
+    import(): Promise<IpcResult<ResumeImport | null>>;
+  };
+  profile: {
+    get(): Promise<IpcResult<SavedProfile>>;
+    /** Saves the reviewed profile; importId links it to the uploaded resume. */
+    save(profile: CandidateProfile, importId?: string): Promise<IpcResult<SavedProfile>>;
+  };
+  projects: {
+    list(): Promise<IpcResult<ProjectList>>;
+    /** Creates (no id) or updates (with id) a project; returns the updated list. */
+    save(project: ProjectInput): Promise<IpcResult<ProjectList>>;
+    delete(id: string): Promise<IpcResult<ProjectList>>;
+  };
+  interview: {
+    /** What the AI knows about you (profile, projects) and whether a provider is ready. */
+    context(): Promise<IpcResult<WorkspaceContextStatus>>;
+    /** Streams an answer suggestion; pieces arrive through ai.onStream. Saves the Q&A to the session when done. */
+    /** regenerate: ask the same question again and replace the previous answer. */
+    /** requestId: chosen by the caller so streamed pieces can never be matched to a different question. */
+    ask(question: string, mode: AnswerMode, sessionId?: string, regenerate?: boolean, requestId?: string): Promise<IpcResult<AskResult>>;
+  };
+  live: {
+    /** Records consent, creates a live session and allows system-audio capture until stop(). */
+    start(consent: LiveConsent): Promise<IpcResult<LiveStart>>;
+    stop(sessionId: string): Promise<IpcResult<boolean>>;
+    /** One recorded speech segment (webm/opus) to text. */
+    transcribe(audio: Uint8Array, mime: string): Promise<IpcResult<Transcript>>;
+  };
+  window: {
+    setAlwaysOnTop(on: boolean): Promise<IpcResult<boolean>>;
+  };
+  jobDescription: {
+    /** Opens a file picker (PDF or DOCX), extracts the text and saves it. null = cancelled. */
+    import(): Promise<IpcResult<JobDescription | null>>;
+    get(): Promise<IpcResult<JobDescription | null>>;
+    clear(): Promise<IpcResult<boolean>>;
+  };
+  sessions: {
+    list(): Promise<IpcResult<SessionRecord[]>>;
+    /** Deletes one session, or "all", on this PC and in Supabase. */
+    delete(id: string | "all"): Promise<IpcResult<SessionRecord[]>>;
+  };
+  panel: {
+    open(): Promise<IpcResult<boolean>>;
+    close(): Promise<IpcResult<boolean>>;
+    /** Main window → panel. */
+    publish(state: PanelState): Promise<IpcResult<boolean>>;
+    /** The latest state, for a panel that has just opened. */
+    getState(): Promise<IpcResult<PanelState | null>>;
+    onState(listener: (state: PanelState) => void): () => void;
+    /** Panel → main window. */
+    act(action: PanelAction): Promise<IpcResult<boolean>>;
+    onAction(listener: (action: PanelAction) => void): () => void;
+  };
+}
