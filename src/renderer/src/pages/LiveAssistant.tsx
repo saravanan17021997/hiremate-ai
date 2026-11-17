@@ -101,7 +101,11 @@ function ConsentStep({ onStarted }: { onStarted: (s: LiveInfo) => void }) {
           <button type="submit" disabled={busy || !ready} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-electric to-violet px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">
             {busy && <Loader2 className="h-4 w-4 animate-spin" />} Start Live Assistant
           </button>
-          <p className="text-xs text-dim">Needs a Groq (free) or OpenAI key for transcription. HireMate hears the sound your computer plays (the other people in the call), not your microphone. The screen picture is never recorded.</p>
+          <p className="text-xs text-dim">
+            {IS_WEB
+              ? "When the browser asks, choose the Google Meet / Teams tab and turn on \"Also share tab audio\" (or choose Entire screen and turn on \"Also share system audio\"). Only the sound is used; the picture is never recorded."
+              : "Needs a Groq (free) or OpenAI key for transcription. HireMate hears the sound your computer plays (the other people in the call), not your microphone. The screen picture is never recorded."}
+          </p>
         </form>
       </section>
     </>
@@ -179,15 +183,22 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
     onComplete: ({ question, raw, regenerated }) =>
       setEarlier((h) => {
         const item = { question, answer: parseAnswer(raw).body, at: Date.now() };
-        return regenerated && h[0]?.question === question ? [item, ...h.slice(1)] : [item, ...h];
+        // Regenerate, or the rest of a question split by a short pause, replaces the previous entry.
+        const replaces = h[0] && ((regenerated && h[0].question === question) || (question.length > h[0].question.length && question.startsWith(h[0].question)));
+        return replaces ? [item, ...h.slice(1)] : [item, ...h];
       }),
   });
   const { current, parsed } = answer;
   const status: Status = answer.status === "thinking" ? "thinking" : answer.status === "streaming" ? "answering" : capture;
   const banner = meeting ? `AI assistant in use · ${session.organisation} (participants informed)` : `AI assistant in use · allowed by ${session.organisation}`;
 
-  useEffect(() => transcriptEnd.current?.scrollIntoView({ block: "end" }), [lines]);
-  useEffect(() => setError(answer.error), [answer.error]);
+  // Braces matter: newer Chrome returns a Promise from scrollIntoView, which React would treat as a cleanup function.
+  useEffect(() => {
+    transcriptEnd.current?.scrollIntoView({ block: "end" });
+  }, [lines]);
+  useEffect(() => {
+    setError(answer.error);
+  }, [answer.error]);
 
   const ask = useCallback((question: string, m: AnswerMode = settings.current.mode, regenerate = false) => {
     setNotice(null);
@@ -413,11 +424,11 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
             }}
             className="max-w-56 rounded-lg border border-white/10 bg-navy-800 px-2 py-1.5 text-sm text-mist outline-none focus:border-electric/50"
           >
-            <option value="system-a">Computer sound{outputName ? ` — ${outputName}` : ""}</option>
+            <option value="system-a">{IS_WEB ? "Meeting tab or screen audio" : `Computer sound${outputName ? ` — ${outputName}` : ""}`}</option>
             {inputs.map((d) => <option key={d.id} value={`device:${d.id}`}>{d.label}</option>)}
           </select>
         </label>
-        <button
+        {!IS_WEB && <button
           type="button"
           onClick={() => void runTest()}
           disabled={Boolean(test && !test.done)}
@@ -425,7 +436,7 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
           className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-sm text-haze hover:bg-white/[0.05] hover:text-mist disabled:opacity-40"
         >
           <Stethoscope className="h-4 w-4" /> {test && !test.done ? "Testing…" : "Test audio"}
-        </button>
+        </button>}
         <StatusChip status={status} />
         {capture !== "idle" && <SoundMeter level={level} />}
         <div className="ml-auto flex flex-wrap items-center gap-2 text-sm">
@@ -448,9 +459,11 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
           <button type="button" onClick={() => void openPanel()} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-haze hover:bg-white/[0.05] hover:text-mist">
             <PanelTopOpen className="h-4 w-4" /> Floating panel
           </button>
-          <button type="button" onClick={() => void toggleTop()} aria-pressed={onTop} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-haze hover:bg-white/[0.05] hover:text-mist">
-            {onTop ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />} {onTop ? "Unpin" : "Keep on top"}
-          </button>
+          {!IS_WEB && (
+            <button type="button" onClick={() => void toggleTop()} aria-pressed={onTop} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-haze hover:bg-white/[0.05] hover:text-mist">
+              {onTop ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />} {onTop ? "Unpin" : "Keep on top"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -463,8 +476,8 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
       {error && <p role="alert" className="mt-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2.5 text-sm text-rose-200">{error}</p>}
       {capture !== "idle" && silentFor >= 12 && (
         <p role="status" className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-100">
-          {source.startsWith("device:") ? "No sound from this input" : "No computer sound"} for {silentFor} seconds. Check that the call or a video is playing and isn't muted.
-          {source === "system-a" && <> If the call is playing, press <strong>Test audio</strong> to find out why.</>}
+          {source.startsWith("device:") ? "No sound from this input" : IS_WEB ? "No meeting sound" : "No computer sound"} for {silentFor} seconds. Check that the call or a video is playing and isn't muted.
+          {source === "system-a" && (IS_WEB ? <> Stop listening, start again, and make sure you turn on <strong>Also share tab audio</strong> in the browser&apos;s share window.</> : <> If the call is playing, press <strong>Test audio</strong> to find out why.</>)}
         </p>
       )}
 
@@ -475,7 +488,7 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
             {lines.length > 0 && <button type="button" onClick={() => { setLines([]); pending.current = []; lastAsked.current = null; }} className="text-xs text-dim hover:text-mist">Clear</button>}
           </div>
           <div className="mt-3 flex-1 space-y-2 overflow-y-auto pr-1" data-selectable>
-            {lines.length === 0 && <p className="text-sm text-dim">{capture !== "idle" ? "Listening… questions appear here as they're asked." : "Press Start listening. HireMate hears what plays through your speakers or headphones."}</p>}
+            {lines.length === 0 && <p className="text-sm text-dim">{capture !== "idle" ? "Listening… questions appear here as they're asked." : IS_WEB ? "Press Start listening, choose the meeting tab, and turn on \"Also share tab audio\"." : "Press Start listening. HireMate hears what plays through your speakers or headphones."}</p>}
             {lines.map((l) => (
               <div key={l.id} className={`group rounded-xl px-3 py-2 text-sm ${l.unclear ? "border border-dashed border-amber-400/30 text-amber-100/80" : l.question ? "bg-electric/10 text-mist" : "text-haze"}`}>
                 {l.text}
@@ -537,6 +550,8 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
     </div>
   );
 }
+
+const IS_WEB = typeof window !== "undefined" && window.hiremate?.platform === "web";
 
 const TEST_QUESTION = "Can you tell me about your experience with REST APIs?";
 const TEST_WORDS = ["tell", "experience", "rest", "apis"];
@@ -729,6 +744,7 @@ async function openSource(source: AudioSource): Promise<{ audio: MediaStreamTrac
       if (e instanceof Error && e.name === "NotReadableError") {
         throw new Error("Windows couldn't open your playback device for listening. Check that your speakers or headset are connected and not in use exclusively by another app (Windows Sound settings → device Properties → Advanced → untick \"Allow applications to take exclusive control\"), then try again.");
       }
+      if (IS_WEB) throw new Error(e instanceof Error && e.name === "NotAllowedError" ? "Sharing was cancelled. Press Start listening and choose the meeting tab." : "The browser couldn't share the meeting audio. Use Chrome or Edge, then try again.");
       throw new Error("Computer sound couldn't be started. Close HireMate and open it again, then try once more.");
     }
     const audio = stream.getAudioTracks();
@@ -765,7 +781,7 @@ async function startCapture(source: AudioSource, getPauseMs: () => number, onSeg
   if (tracks.length === 0) {
     videoTracks.forEach((t) => t.stop());
     void ctx.close();
-    throw new Error("No sound came through. Choose another option in \"Listen to\".");
+    throw new Error(IS_WEB ? "The meeting was shared without its sound. Press Start listening again and turn on \"Also share tab audio\" (or \"Also share system audio\")." : "No sound came through. Choose another option in \"Listen to\".");
   }
   const audioStream = new MediaStream(tracks);
   if (ctx.state !== "running") await ctx.resume().catch(() => undefined);

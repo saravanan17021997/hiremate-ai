@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import "tailwindcss" source("../.."); /* scan all of src/: the desktop screens and the web version share them */
 @import "@fontsource-variable/plus-jakarta-sans";
 
 /* Design tokens: deep navy + charcoal base, electric blue and violet accents, soft white text. */

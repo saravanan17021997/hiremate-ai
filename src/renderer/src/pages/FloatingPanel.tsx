@@ -18,7 +18,7 @@ export function FloatingPanel() {
   const [state, setState] = useState<PanelState | null>(null);
 
   useEffect(() => {
-    document.title = "HireMate AI – Assistant panel";
+    if (window.hiremate.platform !== "web") document.title = "HireMate AI – Assistant panel"; // web: the panel shares the main tab's document
     void window.hiremate.panel.getState().then((r) => r.ok && r.data && setState(r.data));
     return window.hiremate.panel.onState(setState);
   }, []);

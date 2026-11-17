@@ -1,7 +1,7 @@
 // Adapter for every provider that speaks the OpenAI Chat Completions format:
 // OpenAI itself, Groq, and Google Gemini's OpenAI-compatible endpoint.
 import type { ProviderId } from "@shared/types";
-import { PROVIDERS } from "@shared/providers";
+import { PROVIDERS } from "../../shared/providers"; // relative: also used by the web server functions
 import type { AIProvider, StreamRequest } from "./types";
 import { ProviderError } from "./types";
 import { httpErrorMessage, readSseData } from "./sse";

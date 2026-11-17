@@ -3,9 +3,13 @@
 AI-powered interview preparation for Windows. Electron + React + TypeScript + Tailwind.
 See `docs/ARCHITECTURE.md` for the design, security model and phase plan.
 
-**Current phase: 2B done** — app shell, security baseline, Dashboard, Settings with AI providers (OpenAI or Claude
-key, checked and stored encrypted, model choice, streamed test), and optional Supabase sign-in with cloud sync.
-Other modules show "Not built yet".
+**Version 1.0** — Dashboard, AI Interview (Short/Medium/Detailed, regenerate, confidence), My Resume with job
+description, Projects, Live Assistant for consented meetings and AI-allowed interviews (Meet/Teams audio, live
+transcript, question detection, floating panel), and Interview History with delete.
+
+Two ways to run it — see **`docs/HOSTING.md`**:
+- **Windows installer**: `npm run dist:win` → `release/<version>/HireMate-AI-Setup-<version>.exe`
+- **Web version** on Vercel + Supabase (invite-only, AI key kept on the server): `npm run build:web`
 
 ## Connect an AI provider
 
@@ -32,7 +36,7 @@ The app window opens with hot reload. Your local data file is shown on the Dashb
 
 The app works fully offline. To let users sign in and sync:
 
-1. Create a Supabase project. In **SQL Editor**, paste and run `supabase/migrations/20261104000001_hiremate_schema.sql`.
+1. In your Supabase project's **SQL Editor**, paste and run `supabase/hiremate_setup.sql`, then add `hiremate` under **Project Settings → Data API → Exposed schemas** (see `docs/HOSTING.md`).
 2. Copy `.env.example` to `.env` and fill in the **Project URL** and the **anon public** key
    (Project Settings → API; anon key is on the "Legacy API keys" tab). Never the service_role key.
 3. Restart `npm run dev`. Settings → **Account and sync** now shows Sign in / Create account.
@@ -56,7 +60,7 @@ hiremate-ai/
 ├── electron.vite.config.ts     main / preload / renderer builds
 ├── electron-builder.yml        Windows NSIS installer settings
 ├── .env.example                Supabase URL + anon key (public values)
-├── supabase/migrations/        database schema with RLS; supabase/tests/ checks it
+├── supabase/hiremate_setup.sql database setup (own "hiremate" schema, RLS); supabase/tests/ checks it
 ├── docs/ARCHITECTURE.md
 └── src/
     ├── shared/                 plain types and logic used by every process

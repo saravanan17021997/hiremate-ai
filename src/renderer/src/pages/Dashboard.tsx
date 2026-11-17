@@ -80,7 +80,7 @@ export function Dashboard() {
 /* ---------- Readiness: setup checklist with a progress ring ---------- */
 
 const SETUP_STEPS: { key: keyof DashboardSummary["setup"]; label: string; hint: string; to: string; icon: LucideIcon }[] = [
-  { key: "aiProvider", label: "Connect an AI provider", hint: "Free Gemini or Groq key works", to: "/settings", icon: KeyRound },
+  { key: "aiProvider", label: "Connect an AI provider", hint: typeof window !== "undefined" && window.hiremate?.platform === "web" ? "Set up by the owner" : "Free Gemini or Groq key works", to: "/settings", icon: KeyRound },
   { key: "resume", label: "Upload your resume", hint: "PDF or DOCX", to: "/resume", icon: FileText },
   { key: "profile", label: "Complete your profile", hint: "Review what was extracted", to: "/resume", icon: UserRound },
   { key: "projects", label: "Add your projects", hint: "So answers use real examples", to: "/projects", icon: FolderKanban },
@@ -256,14 +256,18 @@ function PrivacyPanel() {
         <li className="flex gap-3">
           <MicOff className="mt-0.5 h-4 w-4 shrink-0 text-haze" />
           <span className="text-haze">
-            <span className="font-medium text-mist">Microphone is off.</span> HireMate can't use it: every browser permission is
-            blocked until you switch the microphone on in a session and confirm.
+            <span className="font-medium text-mist">Not listening.</span> HireMate only hears audio during a Live Assistant session that you
+            start after confirming consent. Meeting audio is never saved.
           </span>
         </li>
         <li className="flex gap-3">
           <HardDrive className="mt-0.5 h-4 w-4 shrink-0 text-haze" />
           <span className="min-w-0 text-haze">
-            <span className="font-medium text-mist">Your data stays on this PC</span> until you sign in to sync it.
+            {window.hiremate.platform === "web" ? (
+              <><span className="font-medium text-mist">Your data is in your own account.</span> Only you can see it; other users of this site can't.</>
+            ) : (
+              <><span className="font-medium text-mist">Your data stays on this PC</span> until you sign in to sync it.</>
+            )}
             {info && (
               <span data-selectable className="mt-1 block truncate text-xs text-dim" title={info.dataLocation}>
                 {info.dataLocation}

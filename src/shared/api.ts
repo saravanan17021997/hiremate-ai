@@ -3,6 +3,8 @@ import type { IpcResult } from "./ipc";
 import type { JobDescription, PanelAction, PanelState, SessionRecord, Transcript, LiveConsent, LiveStart, AccountStatus, AiSettings, AnswerMode, AppInfo, AskResult, WorkspaceContextStatus, CandidateProfile, DashboardSummary, ProjectInput, ProjectList, ProviderId, ResumeImport, SavedProfile, SignUpResult, StreamEvent } from "./types";
 
 export interface HireMateApi {
+  /** "desktop" (Electron) or "web" (browser version on Vercel). A few screens differ slightly. */
+  platform: "desktop" | "web";
   app: {
     getInfo(): Promise<IpcResult<AppInfo>>;
     openExternal(url: string): Promise<IpcResult<boolean>>;

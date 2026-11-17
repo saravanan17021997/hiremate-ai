@@ -68,6 +68,15 @@ export interface ResumeFile {
   text: string;
 }
 
+/** Same checks as readResumeFile, for a file uploaded to the web version. */
+export async function readResumeBytes(fileName: string, bytes: Buffer): Promise<ResumeFile> {
+  if (bytes.length === 0) throw new DocumentError("That file is empty.");
+  if (bytes.length > MAX_BYTES) throw new DocumentError(`This file is ${(bytes.length / 1048576).toFixed(1)} MB. The limit is 10 MB.`);
+  const name = basename(fileName || "document");
+  const fileType = detectType(name, bytes);
+  return { fileName: name, fileType, fileSize: bytes.length, text: await extractText(bytes, fileType) };
+}
+
 export async function readResumeFile(path: string): Promise<ResumeFile> {
   const info = await stat(path);
   if (!info.isFile()) throw new DocumentError("That isn't a file.");

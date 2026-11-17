@@ -49,7 +49,7 @@ cannot read keys or send data anywhere.
 - Uploads (Phase 3): extension + MIME + magic bytes + size limit; parsed in the main process only.
 - Supabase (Phase 2): RLS on every table; the anon key is public by design, the service-role key is never used in the app.
 
-## 4. Data model (Supabase, `supabase/migrations/20261104000001_hiremate_schema.sql`)
+## 4. Data model (Supabase, `supabase/hiremate_setup.sql`, all in the `hiremate` schema)
 
 | Table | Purpose |
 |---|---|

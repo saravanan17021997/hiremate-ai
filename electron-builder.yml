@@ -1,6 +1,8 @@
-# Windows installer settings (used from the packaging phase: npm run dist:win on Windows or GitHub Actions)
+# Windows installer settings. Build on Windows with:  npm run dist:win
+# The installer is written to release/<version>/HireMate-AI-Setup-<version>.exe
 appId: com.saravanan.hiremate
 productName: HireMate AI
+copyright: Copyright © 2026 Saravanan R
 directories:
   buildResources: resources
   output: release/${version}
@@ -9,12 +11,21 @@ files:
   - package.json
 asar: true
 win:
+  icon: resources/icon.ico
   target:
     - target: nsis
       arch: [x64]
   executableName: HireMate AI
+  artifactName: HireMate-AI-Setup-${version}.${ext}
 nsis:
   oneClick: false
+  perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
+  createStartMenuShortcut: true
   shortcutName: HireMate AI
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+  uninstallDisplayName: HireMate AI
+  deleteAppDataOnUninstall: false
+publish: null

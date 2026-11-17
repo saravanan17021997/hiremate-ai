@@ -69,9 +69,10 @@ export function VerifyWarning({ confidence }: { confidence: Confidence | null })
 
 export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
-  const copy = async () => {
+  const copy = async (e: React.MouseEvent<HTMLButtonElement>) => {
     try {
-      await navigator.clipboard.writeText(text);
+      const win = e.currentTarget.ownerDocument.defaultView ?? window; // the web floating panel is a separate window
+      await win.navigator.clipboard.writeText(text);
       setState("copied");
     } catch {
       setState("failed");
@@ -79,7 +80,7 @@ export function CopyButton({ text, label = "Copy" }: { text: string; label?: str
     setTimeout(() => setState("idle"), 1600);
   };
   return (
-    <button type="button" disabled={!text} onClick={() => void copy()} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-haze hover:bg-white/[0.05] hover:text-mist disabled:opacity-40">
+    <button type="button" disabled={!text} onClick={(e) => void copy(e)} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-haze hover:bg-white/[0.05] hover:text-mist disabled:opacity-40">
       {state === "copied" ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
       {state === "copied" ? "Copied" : state === "failed" ? "Couldn't copy" : label}
     </button>

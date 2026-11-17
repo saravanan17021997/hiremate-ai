@@ -16,7 +16,9 @@ export function Settings() {
   const getSettings = useCallback(() => window.hiremate.ai.getSettings(), []);
   const { data, error, loading, reload } = useIpc(getSettings);
   const [settings, setSettings] = useState<AiSettings | null>(null);
-  useEffect(() => setSettings(data), [data]);
+  useEffect(() => {
+    setSettings(data);
+  }, [data]);
 
   return (
     <>
@@ -24,6 +26,14 @@ export function Settings() {
       <div className="space-y-5 pb-12">
         <section className="glass rounded-3xl p-7" aria-labelledby="ai-title">
           <h2 id="ai-title" className="text-lg font-semibold text-mist">AI provider</h2>
+          {settings?.managed ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-400/30 bg-emerald-400/[0.07] px-5 py-4 text-sm">
+              <span className="inline-flex items-center gap-1.5 text-emerald-300"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Ready</span>
+              <span className="text-mist">{settings.managed.label} · {settings.managed.model}</span>
+              <span className="w-full text-haze">The AI is set up on the server by the owner of this HireMate. There's nothing to enter here; keys never reach your browser.</span>
+            </div>
+          ) : (
+          <>
           <p className="mt-1 max-w-2xl text-sm text-haze">
             Use your own API key. HireMate checks it with the provider, then stores it encrypted on this PC. Requests go straight from this app
             to the provider. No key yet? Gemini and Groq give free keys without a card.
@@ -48,16 +58,18 @@ export function Settings() {
                   />
                 ))}
           </div>
+          </>
+          )}
         </section>
 
-        <TryIt ready={Boolean(settings?.activeProvider && settings.activeModel)} label={describeActive(settings)} />
+        <TryIt ready={Boolean(settings?.managed || (settings?.activeProvider && settings.activeModel))} label={describeActive(settings)} />
 
         <div className="grid gap-5 lg:grid-cols-2">
           <AccountCard />
           <section className="glass rounded-3xl p-7">
             <h2 className="flex items-center gap-2 text-lg font-semibold text-mist"><MicOff className="h-5 w-5 text-haze" /> Microphone</h2>
-            <p className="mt-2 text-sm text-haze">Blocked. HireMate asks for your consent in a session before it ever turns the microphone on.</p>
-            <p className="mt-4 flex items-center gap-2 text-sm text-dim"><CircleDashed className="h-4 w-4" /> Consent and transcription: Phase 6.</p>
+            <p className="mt-2 text-sm text-haze">Off. HireMate only listens during a Live Assistant session that you start, after you confirm that everyone has agreed.</p>
+            <p className="mt-4 flex items-center gap-2 text-sm text-dim"><CircleDashed className="h-4 w-4" /> Meeting audio is never saved.</p>
           </section>
         </div>
       </div>
@@ -66,6 +78,7 @@ export function Settings() {
 }
 
 function describeActive(s: AiSettings | null) {
+  if (s?.managed) return `${s.managed.label} · ${s.managed.model}`;
   if (!s?.activeProvider || !s.activeModel) return null;
   const p = s.providers.find((x) => x.id === s.activeProvider);
   return `${p?.label ?? s.activeProvider} · ${s.activeModel}`;
@@ -80,7 +93,9 @@ function ProviderCard({
   const [busy, setBusy] = useState<"save" | "remove" | "model" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [model, setModel] = useState(activeModel ?? provider.models[0] ?? "");
-  useEffect(() => setModel(activeModel ?? provider.models[0] ?? ""), [activeModel, provider.models]);
+  useEffect(() => {
+    setModel(activeModel ?? provider.models[0] ?? "");
+  }, [activeModel, provider.models]);
 
   const run = async (kind: "save" | "remove" | "model", call: () => ReturnType<typeof window.hiremate.ai.getSettings>) => {
     setBusy(kind);

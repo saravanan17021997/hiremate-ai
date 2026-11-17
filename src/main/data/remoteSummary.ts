@@ -1,5 +1,5 @@
 // Converts the JSON from the dashboard_summary() database function into the dashboard shape.
-import { profileCompletion } from "@shared/profile";
+import { profileCompletion } from "../../shared/profile"; // relative: also used by the web version
 import type { CandidateProfile, DashboardSummary } from "@shared/types";
 
 type Remote = {

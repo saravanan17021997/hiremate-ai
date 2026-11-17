@@ -2,5 +2,9 @@ node_modules
 out
 release
 dist
+dist-web
+.vercel
 *.log
 .env
+.env.*
+!.env.example

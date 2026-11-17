@@ -8,6 +8,7 @@ import type { HireMateApi } from "../shared/api";
 const invoke = <T>(channel: string, input?: unknown) => ipcRenderer.invoke(channel, input) as Promise<IpcResult<T>>;
 
 const api: HireMateApi = {
+  platform: "desktop",
   app: {
     getInfo: () => invoke<AppInfo>(IPC.appGetInfo),
     openExternal: (url) => invoke<boolean>(IPC.shellOpenExternal, url),

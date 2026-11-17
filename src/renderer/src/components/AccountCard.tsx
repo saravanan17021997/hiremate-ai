@@ -9,7 +9,9 @@ export function AccountCard() {
   const getStatus = useCallback(() => window.hiremate.account.getStatus(), []);
   const { data, error: loadError } = useIpc(getStatus);
   const [status, setStatus] = useState<AccountStatus | null>(null);
-  useEffect(() => setStatus(data), [data]);
+  useEffect(() => {
+    setStatus(data);
+  }, [data]);
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");

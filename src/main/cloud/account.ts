@@ -3,6 +3,7 @@
 // so the app screen never sees tokens either.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { DB_SCHEMA } from "../../shared/types";
 import type { AccountStatus, SignUpResult } from "@shared/types";
 import type { SecretStore } from "../secrets/secretStore";
 import type { CloudConfig } from "./config";
@@ -22,7 +23,7 @@ export function friendlyAuthError(message: string): string {
 }
 
 export class AccountService {
-  readonly client: SupabaseClient | null;
+  readonly client: SupabaseClient<any, any, any> | null;
   private persisted: boolean;
 
   constructor(
@@ -41,6 +42,7 @@ export class AccountService {
     this.client = config
       ? clientFactory(config.url, config.anonKey, {
           auth: { storage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+          db: { schema: DB_SCHEMA }, // HireMate's own schema: never touches other apps' tables
         })
       : null;
   }

@@ -49,6 +49,9 @@ export interface AppInfo {
 
 // ---------- Phase 2A: AI providers ----------
 
+/** HireMate keeps all its tables in this database schema, so it can share a Supabase project with other apps. */
+export const DB_SCHEMA = "hiremate";
+
 export type ProviderId = "gemini" | "groq" | "openai" | "anthropic";
 
 export interface ProviderStatus {
@@ -64,6 +67,8 @@ export interface AiSettings {
   activeProvider: ProviderId | null;
   activeModel: string | null;
   encryptionAvailable: boolean; // Windows can encrypt secrets for this user
+  /** Web version: the AI is set up on the server by the owner; there are no keys to enter. */
+  managed?: { label: string; model: string };
 }
 
 /** Progress while waiting for the first words, so the screen can say what's happening. */

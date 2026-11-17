@@ -25,7 +25,9 @@ export function Projects() {
   const [editing, setEditing] = useState<ProjectInput | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => setList(data), [data]);
+  useEffect(() => {
+    setList(data);
+  }, [data]);
 
   const save = async (p: ProjectInput) => {
     setBusy(true);
