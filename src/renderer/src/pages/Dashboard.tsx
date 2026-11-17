@@ -7,6 +7,7 @@ import {
 import { useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { DashboardSummary, SessionSummary } from "@shared/types";
+import { APP_NAME } from "@shared/brand";
 import { PageHeader } from "../components/PageHeader";
 import { useIpc } from "../lib/useIpc";
 
@@ -40,7 +41,7 @@ export function Dashboard() {
   return (
     <>
       <PageHeader
-        title={data.candidateName ? `Welcome back, ${data.candidateName.split(" ")[0]}` : "Welcome to HireMate AI"}
+        title={data.candidateName ? `Welcome back, ${data.candidateName.split(" ")[0]}` : `Welcome to ${APP_NAME}`}
         subtitle="Prepare with answers grounded in your own resume, experience and projects."
         actions={
           <Link to="/settings" className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-haze hover:text-mist">

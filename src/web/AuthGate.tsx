@@ -3,6 +3,7 @@
 import { Loader2, LogOut } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Logo } from "@renderer/components/Logo";
+import { APP_NAME, CREDIT } from "@shared/brand";
 import { configProblem, supabase } from "./supabase";
 import { loadMe } from "./webApi";
 
@@ -42,7 +43,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         <div className="flex items-center gap-3">
           <Logo size={36} />
           <div>
-            <h1 className="text-lg font-semibold text-mist">HireMate AI</h1>
+            <h1 className="text-lg font-semibold text-mist">{APP_NAME}</h1>
             <p className="text-sm text-haze">Interview and meeting preparation</p>
           </div>
         </div>
@@ -55,6 +56,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         ) : (
           <SignIn />
         )}
+        <p className="mt-8 text-center text-xs text-dim">{CREDIT}</p>
       </div>
     </div>
   );

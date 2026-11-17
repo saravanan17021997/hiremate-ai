@@ -4,6 +4,7 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { NAV } from "../lib/nav";
+import { APP_NAME, CREDIT } from "@shared/brand";
 import { Logo } from "./Logo";
 
 type Props = { collapsed: boolean; onToggle: () => void };
@@ -21,7 +22,7 @@ export function Sidebar({ collapsed, onToggle }: Props) {
     >
       <div className="drag-region flex h-16 items-center gap-3 px-5 pt-2">
         <Logo />
-        {!collapsed && <span className="text-[15px] font-semibold tracking-tight text-mist">HireMate AI</span>}
+        {!collapsed && <span className="text-[15px] font-semibold tracking-tight text-mist">{APP_NAME}</span>}
       </div>
 
       <nav aria-label="Main" className="no-drag mt-4 flex flex-1 flex-col gap-1 px-3">
@@ -62,8 +63,9 @@ export function Sidebar({ collapsed, onToggle }: Props) {
       >
         {collapsed ? <PanelLeftOpen className="h-[18px] w-[18px]" /> : <PanelLeftClose className="h-[18px] w-[18px]" />}
         {!collapsed && <span>Collapse</span>}
-        {!collapsed && version && <span className="ml-auto text-xs text-dim" title="HireMate AI version">v{version}</span>}
+        {!collapsed && version && <span className="ml-auto text-xs text-dim" title={`${APP_NAME} version`}>v{version}</span>}
       </button>
+      {!collapsed && <p className="px-6 pb-4 text-xs text-dim">{CREDIT}</p>}
     </motion.aside>
   );
 }

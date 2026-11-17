@@ -2,6 +2,7 @@
 // and it closes when the live session ends. It's an ordinary window, so it shows in screen sharing.
 import { AlertTriangle, Ear, Loader2, MicOff, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
+import { APP_NAME } from "@shared/brand";
 import type { PanelAction, PanelState } from "@shared/types";
 import { Markdown } from "../components/Markdown";
 import { AnswerMeta, CopyButton, RegenerateButton, VerifyWarning } from "../components/AnswerParts";
@@ -18,7 +19,7 @@ export function FloatingPanel() {
   const [state, setState] = useState<PanelState | null>(null);
 
   useEffect(() => {
-    if (window.hiremate.platform !== "web") document.title = "HireMate AI – Assistant panel"; // web: the panel shares the main tab's document
+    if (window.hiremate.platform !== "web") document.title = `${APP_NAME} – Assistant panel`; // web: the panel shares the main tab's document
     void window.hiremate.panel.getState().then((r) => r.ok && r.data && setState(r.data));
     return window.hiremate.panel.onState(setState);
   }, []);

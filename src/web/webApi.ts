@@ -14,6 +14,8 @@ import { configProblem, supabase } from "./supabase";
 import { pickFile } from "./pickFile";
 import { closePanel, openPanel, panelBus } from "./pip";
 
+import { APP_NAME } from "@shared/brand";
+
 declare const __APP_VERSION__: string;
 
 const ok = <T>(data: T): IpcResult<T> => ({ ok: true, data });
@@ -208,7 +210,7 @@ export function createWebApi(): HireMateApi {
   return {
     platform: "web",
     app: {
-      getInfo: () => wrap(async () => ({ name: "HireMate AI", version: __APP_VERSION__, platform: "web", dataLocation: "Your HireMate account (Supabase)" })),
+      getInfo: () => wrap(async () => ({ name: APP_NAME, version: __APP_VERSION__, platform: "web", dataLocation: "Your HireMate account (Supabase)" })),
       openExternal: (url) => wrap(async () => Boolean(window.open(url, "_blank", "noopener,noreferrer"))),
     },
     dashboard: {

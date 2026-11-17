@@ -2,6 +2,7 @@
 // It is a normal visible window (it shows up in screen sharing like any other window).
 import { BrowserWindow, screen } from "electron";
 import { hardenWebContents } from "./security";
+import { APP_NAME } from "../shared/brand";
 
 let panel: BrowserWindow | null = null;
 
@@ -20,7 +21,7 @@ export function openPanel(load: (win: BrowserWindow, hash: string) => void, webP
     minWidth: 320,
     minHeight: 360,
     alwaysOnTop: true,
-    title: "HireMate AI – Assistant panel",
+    title: `${APP_NAME} – Assistant panel`,
     backgroundColor: "#070b16",
     autoHideMenuBar: true,
     webPreferences,

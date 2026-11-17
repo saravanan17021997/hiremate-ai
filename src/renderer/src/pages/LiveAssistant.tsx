@@ -13,6 +13,7 @@ import { PAUSE_CHOICES, SpeechSegmenter, type PauseChoice } from "../lib/segment
 import { isLikelyQuestion, pendingQuestion, type HeardLine } from "../lib/questions";
 import { stageText, useAnswer } from "../lib/useAnswer";
 import { parseAnswer } from "@shared/answerMeta";
+import { APP_NAME } from "@shared/brand";
 import { AnswerMeta, CopyButton, LengthPicker, RegenerateButton, VerifyWarning } from "../components/AnswerParts";
 
 type Status = "idle" | "listening" | "transcribing" | "thinking" | "answering";
@@ -21,8 +22,8 @@ type LiveInfo = { id: string; purpose: LivePurpose; organisation: string; permis
 
 const disclosure = (purpose: LivePurpose, name: string) =>
   purpose === "meeting"
-    ? "FYI: I'm using HireMate AI, an AI assistant that transcribes this meeting to help me answer questions."
-    : `I'm using HireMate AI, an AI interview assistant, during this interview as agreed with ${name || "your team"}.`;
+    ? `FYI: I'm using ${APP_NAME}, an AI assistant that transcribes this meeting to help me answer questions.`
+    : `I'm using ${APP_NAME}, an AI interview assistant, during this interview as agreed with ${name || "your team"}.`;
 const input = "w-full rounded-xl border border-white/10 bg-navy-800 px-3 py-2.5 text-sm text-mist outline-none focus:border-electric/50";
 
 export function LiveAssistant() {

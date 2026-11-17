@@ -14,6 +14,7 @@ import { SessionService } from "./interview/sessionService";
 import { JobDescriptionService } from "./jd/jobDescriptionService";
 import { registerIpcHandlers } from "./ipc/handlers";
 import { applySessionSecurity, hardenWebContents } from "./security";
+import { APP_NAME } from "../shared/brand";
 
 // One copy of the app at a time.
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -27,7 +28,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 680,
     show: false,
-    title: "HireMate AI",
+    title: APP_NAME,
     backgroundColor: "#070b16",
     autoHideMenuBar: true,
     // Windows: dark custom title bar that keeps the native minimise/maximise/close buttons.

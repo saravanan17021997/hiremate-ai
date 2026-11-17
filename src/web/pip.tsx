@@ -1,6 +1,7 @@
 // Web floating panel: a small always-on-top window using Chrome/Edge "Document Picture-in-Picture".
 // It shows the same FloatingPanel as the desktop app and talks to the page through a tiny event bus.
 import { createRoot, type Root } from "react-dom/client";
+import { APP_NAME } from "@shared/brand";
 import type { PanelAction, PanelState } from "@shared/types";
 import { FloatingPanel } from "@renderer/pages/FloatingPanel";
 
@@ -53,7 +54,7 @@ export async function openPanel(): Promise<void> {
       }
     }
   }
-  win.document.title = "HireMate AI – Assistant panel";
+  win.document.title = `${APP_NAME} – Assistant panel`;
   win.document.documentElement.className = document.documentElement.className;
   win.document.body.className = document.body.className;
   win.document.body.style.margin = "0";
