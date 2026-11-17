@@ -98,6 +98,30 @@ Note: sign-in accounts are shared across apps in the same Supabase project. That
    (or choose **Entire screen** and turn on **Also share system audio**).
 5. Click **Floating panel** for a small always-on-top window with the current question and answer.
 
+### 6. Phone screen and phone microphone mode (v1.1)
+
+**One-time setup (if you set up Supabase before v1.1):** Supabase → **SQL Editor → New query** → paste the whole
+of **`supabase/hiremate_phone_screen.sql`** → **Run** ("Success. No rows returned" is correct). It adds one table,
+`hiremate.live_feed`, in HireMate's own schema, and turns on instant updates for it. Nothing in `public` changes.
+(New installs get it from `hiremate_setup.sql`.)
+
+**Phone screen (Google Meet / Teams):**
+1. On your **laptop**, open HireMate in Chrome or Edge → **Live Assistant** → start, and share the meeting tab with
+   **Also share tab audio**, exactly as before.
+2. On your **phone**, open `https://<your-site>/#/phone` (or tap **Phone** in the bottom bar) and sign in with the
+   **same account**.
+3. Each question appears on the phone as **Question #N** with its **Suggested reply #N**, as the laptop writes it.
+   Short / Medium / Detailed / Regenerate on the phone are carried out by the laptop. The laptop shows
+   **Phone screen connected** while the phone page is open.
+
+The laptop does the listening: phones can't hear a call running on the phone itself (Android and iPhone keep call
+sound private), so the meeting has to run on the laptop.
+
+**Phone microphone mode:** open **Live** on the phone itself. It listens through the phone's microphone or a
+Bluetooth headset's microphone (choose it in **Listen to**), so it hears speech near the phone: an in-person
+conversation, or a call playing on another device's speaker. If the headset disconnects, it continues on the
+phone microphone and switches back when the headset returns.
+
 ### Limits to know
 - All web users share your Groq free-plan limit (about 8,000 tokens a minute for gpt-oss models).
   If it's reached, HireMate waits a few seconds and retries, or says so.

@@ -91,3 +91,22 @@ reads `MAIN_VITE_SUPABASE_URL` / `MAIN_VITE_SUPABASE_ANON_KEY` from `.env`; a se
    (`delta` / `done` / `error`) tagged with a request id. The UI can cancel by id.
 5. Development only: `HIREMATE_OPENAI_BASE_URL` / `HIREMATE_ANTHROPIC_BASE_URL` point at a local test server, and
    `HIREMATE_E2E=1` allows Linux test machines without a keyring to run. Both are ignored in the installed app.
+
+
+## Phone screen (v1.1)
+
+- **Why the laptop listens:** mobile browsers can't share tab or app audio, and Android/iOS don't let any app
+  capture call audio (Meet/Teams use the voice-communication audio usage, which playback capture excludes; the
+  microphone is given only to the call app during a call). So a meeting's remote voices are captured on the laptop.
+- **Relay:** one row per user in `hiremate.live_feed` (RLS: own row only). The laptop's Live Assistant upserts the
+  floating-panel state plus `seq` (question number), `requestId` (the answer request) and `rev` (always growing),
+  throttled to one write per 150 ms and sent in order; new questions and status changes go immediately.
+- **Phone:** subscribes to its row with Supabase Realtime (`postgres_changes`, filter `user_id=eq.<uid>`) and also
+  reads it every 3 s (every 1 s while Realtime is down or reconnecting). An update with a lower `rev` is ignored,
+  so a late update can never replace newer text, and question + answer always come from the same row version.
+- **Buttons:** the phone writes `request = {id, action, seq}`; the laptop carries it out. A Regenerate pressed for
+  an older question number is ignored; a length choice for an older question only changes the setting.
+- **Presence:** `laptop_seen_at` / `viewer_seen_at` heartbeats show "Laptop connected" / "Phone screen connected".
+- **Phone microphone mode:** on phones the Live Assistant uses `getUserMedia` (phone or Bluetooth headset mic,
+  voice-tuned). Track `ended` (headset gone) → continues on the phone microphone and switches back on
+  `devicechange`; track `mute` (the OS took the mic, e.g. a call) → "Audio unavailable".

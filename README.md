@@ -1,11 +1,17 @@
-# HireMate AI
+# SD HireMate AI
 
-AI-powered interview preparation for Windows. Electron + React + TypeScript + Tailwind.
+AI-powered interview preparation for Windows and the web. Developed by Saravanan. Electron + React + TypeScript + Tailwind.
 See `docs/ARCHITECTURE.md` for the design, security model and phase plan.
 
 **Version 1.0** — Dashboard, AI Interview (Short/Medium/Detailed, regenerate, confidence), My Resume with job
 description, Projects, Live Assistant for consented meetings and AI-allowed interviews (Meet/Teams audio, live
 transcript, question detection, floating panel), and Interview History with delete.
+
+**Version 1.1** — **Phone screen**: a live session on your laptop shows each question and its suggested reply on
+your phone instantly (Supabase Realtime, with a 1-second fallback), and the phone's Short/Medium/Detailed/Regenerate
+buttons work the laptop. **Phone microphone mode**: the Live Assistant on a phone listens through the phone or a
+Bluetooth headset microphone. Mobile layout throughout. Existing Supabase installs: run
+`supabase/hiremate_phone_screen.sql` once.
 
 Two ways to run it — see **`docs/HOSTING.md`**:
 - **Windows installer**: `npm run dist:win` → `release/<version>/HireMate-AI-Setup-<version>.exe`

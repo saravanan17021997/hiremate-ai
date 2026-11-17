@@ -85,6 +85,14 @@ const api: HireMateApi = {
       return () => ipcRenderer.removeListener(IPC_EVENTS.panelAction, handler);
     },
   },
+  // Phone screen runs on the web version (laptop in Chrome/Edge → phone); the desktop app doesn't send to a phone.
+  phone: {
+    available: false,
+    publish: async () => ({ ok: false, error: "Phone screen works with the web version." }),
+    seen: async () => ({ ok: false, error: "Phone screen works with the web version." }),
+    request: async () => ({ ok: false, error: "Phone screen works with the web version." }),
+    watch: () => () => undefined,
+  },
 };
 
 contextBridge.exposeInMainWorld("hiremate", api);

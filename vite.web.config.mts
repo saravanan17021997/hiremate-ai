@@ -19,7 +19,7 @@ function contentSecurityPolicy(supabaseUrl: string): Plugin {
       dev = c.command === "serve";
     },
     transformIndexHtml(html) {
-      const supabase = supabaseUrl ? `${supabaseUrl} ${supabaseUrl.replace(/^https:/, "wss:")}` : "";
+      const supabase = supabaseUrl ? `${supabaseUrl} ${supabaseUrl.replace(/^http(s?):/, "ws$1:")}` : ""; // the websocket is for instant phone-screen updates
       const csp = [
         "default-src 'self'",
         dev ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",

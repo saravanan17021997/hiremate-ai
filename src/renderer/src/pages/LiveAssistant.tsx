@@ -2,19 +2,21 @@
 // where the employer has ALLOWED AI assistance. Everyone must know an AI assistant is transcribing:
 // the app shows a disclosure line for the chat and keeps an "AI assistant in use" notice visible.
 // Audio is captured only while you are listening.
-import { AlertTriangle, Check, Copy, Ear, Loader2, Mic, MicOff, PanelTopOpen, Pin, PinOff, ShieldCheck, Square, Stethoscope, Wand2, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { AlertTriangle, Bluetooth, Check, Copy, Ear, Headphones, Loader2, Mic, MicOff, PanelTopOpen, Pin, PinOff, ShieldCheck, Smartphone, Square, Stethoscope, Wand2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import type { AnswerMode, LivePurpose } from "@shared/types";
+import type { AnswerMode, AudioState, LivePurpose, PanelAction, PhoneFeedState } from "@shared/types";
 import { PageHeader } from "../components/PageHeader";
 import { Markdown } from "../components/Markdown";
 import { useIpc } from "../lib/useIpc";
 import { PAUSE_CHOICES, SpeechSegmenter, type PauseChoice } from "../lib/segmenter";
-import { isLikelyQuestion, pendingQuestion, type HeardLine } from "../lib/questions";
+import { continuesQuestion, isLikelyQuestion, pendingQuestion, type HeardLine } from "../lib/questions";
 import { stageText, useAnswer } from "../lib/useAnswer";
 import { parseAnswer } from "@shared/answerMeta";
 import { APP_NAME } from "@shared/brand";
 import { AnswerMeta, CopyButton, LengthPicker, RegenerateButton, VerifyWarning } from "../components/AnswerParts";
+import { CAN_SHARE_TAB_AUDIO, IS_MOBILE, KIND_LABEL, inputKind } from "../lib/device";
+import { usePhoneRelay } from "../lib/usePhoneRelay";
 
 type Status = "idle" | "listening" | "transcribing" | "thinking" | "answering";
 type Line = { id: number; text: string; question: boolean; unclear: boolean };
@@ -103,7 +105,9 @@ function ConsentStep({ onStarted }: { onStarted: (s: LiveInfo) => void }) {
             {busy && <Loader2 className="h-4 w-4 animate-spin" />} Start Live Assistant
           </button>
           <p className="text-xs text-dim">
-            {IS_WEB
+            {MIC_MODE
+              ? "Phone microphone mode: HireMate listens through this phone's microphone or your Bluetooth headset's microphone, so it hears speech near the phone (in person, or a call playing on another device's speaker). It can't hear a call running on this same phone. For Google Meet or Teams, run the meeting on your laptop and open Phone screen here instead."
+              : IS_WEB
               ? "When the browser asks, choose the Google Meet / Teams tab and turn on \"Also share tab audio\" (or choose Entire screen and turn on \"Also share system audio\"). Only the sound is used; the picture is never recorded."
               : "Needs a Groq (free) or OpenAI key for transcription. HireMate hears the sound your computer plays (the other people in the call), not your microphone. The screen picture is never recorded."}
           </p>
@@ -171,6 +175,13 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
   }, []);
   const [silentFor, setSilentFor] = useState(0); // seconds with no sound reaching the app
   const lastSound = useRef(0);
+  // Microphone mode (phones): which input is in use, and whether the phone has taken it away.
+  const [micLabel, setMicLabel] = useState("");
+  const [micMuted, setMicMuted] = useState(false);
+  const [audioProblem, setAudioProblem] = useState<string | null>(null);
+  const wantListening = useRef(false); // you pressed Start (and not Stop): keep listening through device changes
+  const activeSource = useRef<AudioSource | null>(null);
+  const fallbackFrom = useRef<AudioSource | null>(null); // the headset we switched away from when it disconnected
 
   const audio = useRef<{ stop: () => void } | null>(null);
   const pending = useRef<HeardLine[]>([]);
@@ -250,8 +261,9 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
         }
         // Same breath: speech that starts within 1 s of the last question ending is the rest of that
         // question (a short pause cut it in two), so the whole question is answered, not half of it.
+        // But a complete new question right after a finished one is a NEW question, answered on its own.
         const last = lastAsked.current;
-        if (last && at.startedAt - last.endedAt < CONTINUE_MS) {
+        if (last && continuesQuestion(last.question, text, at.startedAt - last.endedAt, CONTINUE_MS)) {
           const whole = `${last.question} ${text}`.replace(/\s+/g, " ").trim().slice(-1000);
           lastAsked.current = { question: whole, endedAt: at.endedAt };
           pending.current = [];
@@ -277,9 +289,18 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
   useEffect(() => {
     const load = () =>
       void navigator.mediaDevices.enumerateDevices().then((list) => {
-        setInputs(list.filter((d) => d.kind === "audioinput" && d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications").map((d, i) => ({ id: d.deviceId, label: d.label || `Sound input ${i + 1}` })));
+        const found = list.filter((d) => d.kind === "audioinput" && d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications").map((d, i) => ({ id: d.deviceId, label: d.label || `Sound input ${i + 1}` }));
+        setInputs(found);
         const out = list.find((d) => d.kind === "audiooutput" && d.deviceId === "default")?.label ?? "";
         setOutputName(out.replace(/^Default\s*-\s*/i, ""));
+        // A headset that disconnected earlier is back: listen through it again.
+        const back = fallbackFrom.current;
+        if (MIC_MODE && back && wantListening.current && found.some((d) => `device:${d.id}` === back)) {
+          fallbackFrom.current = null;
+          setNotice(null);
+          setAudioProblem(null);
+          void switchTo(back, "Your headset is back: listening through it again.");
+        }
       }).catch(() => setInputs([]));
     load();
     navigator.mediaDevices.addEventListener("devicechange", load);
@@ -311,30 +332,72 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
     setTimeout(() => updateTest((x) => ({ ...x, heard: x.heard === "pending" ? "fail" : x.heard, text: x.text === "pending" ? "fail" : x.text, question: x.question === "pending" ? "fail" : x.question, answer: x.answer === "pending" ? "fail" : x.answer, done: true })), 30_000);
   };
 
-  const startListening = async (from: AudioSource = source) => {
+  const startListening = async (from: AudioSource = source, info?: string) => {
     setError(null);
+    wantListening.current = true;
     try {
       lastSound.current = performance.now();
       setSilentFor(0);
-      audio.current = await startCapture(from, () => pauseMs.current, onSegment, () => { audio.current = null; setCapture("idle"); setLevel(0); }, (rms) => {
+      const started = await startCapture(from, () => pauseMs.current, onSegment, () => {
+        // The input stopped from outside: sharing ended, or (phones) the headset disconnected.
+        audio.current = null;
+        setCapture("idle");
+        setLevel(0);
+        setMicMuted(false);
+        if (MIC_MODE && wantListening.current) void inputLost(from);
+      }, (rms) => {
         setLevel(rms);
         const now = performance.now();
         if (rms >= 0.01) updateTest((t) => (t.heard === "pending" ? { ...t, heard: "ok", heardMs: Math.round(now - t.startedAt) } : t));
         if (rms >= 0.005) lastSound.current = now;
         setSilentFor(Math.floor((now - lastSound.current) / 1000));
-      });
+      }, setMicMuted);
+      audio.current = started;
+      activeSource.current = from;
+      setMicLabel(started.label);
+      setMicMuted(false);
+      setAudioProblem(null);
       setCapture("listening");
+      if (info) setNotice(info);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't start listening.");
+      const message = e instanceof Error ? e.message : "Couldn't start listening.";
+      setError(message);
+      setAudioProblem(message);
+      if (!fallbackFrom.current) wantListening.current = false;
     }
   };
 
-  const stopListening = () => {
+  /** Phones: the input in use went away (e.g. Bluetooth headset off or out of range). */
+  const inputLost = async (from: AudioSource) => {
+    const name = micLabelRef.current || "The microphone";
+    if (from.startsWith("device:")) {
+      fallbackFrom.current = from;
+      setAudioProblem(`${name} disconnected.`);
+      await startListening("mic", `${name} disconnected: listening through the phone microphone until it's back.`);
+    } else {
+      setAudioProblem(`${name} stopped. Press Start listening to try again.`);
+      wantListening.current = false;
+    }
+  };
+  const micLabelRef = useRef("");
+  micLabelRef.current = micLabel;
+
+  const switchTo = async (to: AudioSource, info?: string) => {
     audio.current?.stop();
     audio.current = null;
+    await startListening(to, info);
+  };
+
+  const stopListening = () => {
+    wantListening.current = false;
+    fallbackFrom.current = null;
+    audio.current?.stop();
+    audio.current = null;
+    activeSource.current = null;
     setCapture("idle");
     setLevel(0);
     setSilentFor(0);
+    setMicMuted(false);
   };
 
   const end = async () => {
@@ -376,6 +439,41 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
     });
   }, [status, current, parsed, mode, notice, banner, answer.busy, answer.error]);
 
+  // Phone screen (web version on a laptop): the same content, sent to your phone.
+  const audioState: AudioState = capture !== "idle" ? (micMuted ? "unavailable" : "listening") : audioProblem ? "unavailable" : "paused";
+  const audioNote =
+    capture !== "idle"
+      ? micMuted ? "The phone paused the microphone (a call or another app is using it)."
+      : silentFor >= 12 ? `No sound for ${silentFor} s.` : null
+      : audioProblem;
+  const feedState = useMemo<PhoneFeedState>(() => ({
+    status,
+    question: current?.question ?? "",
+    answer: parsed.body,
+    mode: current?.mode ?? mode,
+    questionType: parsed.questionType,
+    confidence: answer.busy ? null : parsed.confidence,
+    firstWordsMs: current?.firstWordsMs ?? null,
+    totalMs: current?.totalMs ?? null,
+    disclosure: banner,
+    notice: notice ?? answer.error,
+    audio: audioState,
+    audioNote,
+    requestId: current?.requestId ?? null,
+  }), [status, current, parsed, mode, banner, notice, answer.busy, answer.error, audioState, audioNote]);
+  const relay = usePhoneRelay({
+    enabled: !MIC_MODE,
+    sessionId: session.id,
+    state: feedState,
+    onAction: (action: PanelAction, forCurrent: boolean) => {
+      // A press for an older question never regenerates that old question: only the length choice is kept.
+      if (action === "regenerate") {
+        if (forCurrent && current) regenerate(current.mode);
+      } else if (current && forCurrent) regenerate(action);
+      else setMode(action);
+    },
+  });
+
   useEffect(
     () =>
       window.hiremate.panel.onAction((action) => {
@@ -396,7 +494,7 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
   };
 
   return (
-    <div className="pb-10 pt-10">
+    <div className="pb-10 pt-6 sm:pt-10">
       {/* Always-visible disclosure notice */}
       <div role="status" className="drag-region flex flex-wrap items-center gap-3 rounded-2xl border border-violet/40 bg-violet/15 px-5 py-3 text-sm text-violet-soft">
         <ShieldCheck className="h-5 w-5 shrink-0" />
@@ -425,8 +523,12 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
             }}
             className="max-w-56 rounded-lg border border-white/10 bg-navy-800 px-2 py-1.5 text-sm text-mist outline-none focus:border-electric/50"
           >
-            <option value="system-a">{IS_WEB ? "Meeting tab or screen audio" : `Computer sound${outputName ? ` — ${outputName}` : ""}`}</option>
-            {inputs.map((d) => <option key={d.id} value={`device:${d.id}`}>{d.label}</option>)}
+            {MIC_MODE ? (
+              <option value="mic">Phone microphone (default)</option>
+            ) : (
+              <option value="system-a">{IS_WEB ? "Meeting tab or screen audio" : `Computer sound${outputName ? ` — ${outputName}` : ""}`}</option>
+            )}
+            {inputs.map((d) => <option key={d.id} value={`device:${d.id}`}>{MIC_MODE ? `${KIND_LABEL[inputKind(d.label)]} — ${d.label}` : d.label}</option>)}
           </select>
         </label>
         {!IS_WEB && <button
@@ -457,9 +559,12 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
               {PAUSE_CHOICES.map((c) => <option key={c.id} value={c.id}>{c.label} ({c.ms / 1000} s)</option>)}
             </select>
           </label>
-          <button type="button" onClick={() => void openPanel()} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-haze hover:bg-white/[0.05] hover:text-mist">
-            <PanelTopOpen className="h-4 w-4" /> Floating panel
-          </button>
+          {!MIC_MODE && (
+            <button type="button" onClick={() => void openPanel()} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-haze hover:bg-white/[0.05] hover:text-mist">
+              <PanelTopOpen className="h-4 w-4" /> Floating panel
+            </button>
+          )}
+          {relay.enabled && <PhoneLinkChip connected={relay.phoneConnected} />}
           {!IS_WEB && (
             <button type="button" onClick={() => void toggleTop()} aria-pressed={onTop} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-haze hover:bg-white/[0.05] hover:text-mist">
               {onTop ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />} {onTop ? "Unpin" : "Keep on top"}
@@ -468,7 +573,9 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
         </div>
       </div>
 
-      {source.startsWith("device:") && (
+      {relay.problem && <p role="alert" className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-100">Phone screen: {relay.problem}</p>}
+      {MIC_MODE && <MicStatus listening={capture !== "idle"} label={micLabel} muted={micMuted} problem={capture === "idle" ? audioProblem : null} />}
+      {!MIC_MODE && source.startsWith("device:") && (
         <p className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-haze">
           A microphone hears <strong className="text-mist">you and the room</strong>, not the other side of a call in your headphones. For Google Meet, Teams or Zoom choose <strong className="text-mist">Computer sound</strong>.
         </p>
@@ -477,19 +584,19 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
       {error && <p role="alert" className="mt-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2.5 text-sm text-rose-200">{error}</p>}
       {capture !== "idle" && silentFor >= 12 && (
         <p role="status" className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-100">
-          {source.startsWith("device:") ? "No sound from this input" : IS_WEB ? "No meeting sound" : "No computer sound"} for {silentFor} seconds. Check that the call or a video is playing and isn't muted.
-          {source === "system-a" && (IS_WEB ? <> Stop listening, start again, and make sure you turn on <strong>Also share tab audio</strong> in the browser&apos;s share window.</> : <> If the call is playing, press <strong>Test audio</strong> to find out why.</>)}
+          {MIC_MODE ? <>No sound from the microphone for {silentFor} seconds. If a phone, Meet or Teams call is running on this phone, the phone gives its microphone to the call app only: run the meeting on your laptop and use <strong>Phone screen</strong> instead.</> : <>{source.startsWith("device:") ? "No sound from this input" : IS_WEB ? "No meeting sound" : "No computer sound"} for {silentFor} seconds. Check that the call or a video is playing and isn&apos;t muted.</>}
+          {!MIC_MODE && source === "system-a" && (IS_WEB ? <> Stop listening, start again, and make sure you turn on <strong>Also share tab audio</strong> in the browser&apos;s share window.</> : <> If the call is playing, press <strong>Test audio</strong> to find out why.</>)}
         </p>
       )}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-        <section className="glass flex h-[60vh] flex-col rounded-3xl p-5" aria-label="Transcript">
+        <section className="glass order-2 flex h-[40vh] flex-col rounded-3xl p-4 sm:p-5 lg:order-none lg:h-[60vh]" aria-label="Transcript">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-haze">{meeting ? "Meeting (live transcript)" : "Interviewer (live transcript)"}</h2>
             {lines.length > 0 && <button type="button" onClick={() => { setLines([]); pending.current = []; lastAsked.current = null; }} className="text-xs text-dim hover:text-mist">Clear</button>}
           </div>
           <div className="mt-3 flex-1 space-y-2 overflow-y-auto pr-1" data-selectable>
-            {lines.length === 0 && <p className="text-sm text-dim">{capture !== "idle" ? "Listening… questions appear here as they're asked." : IS_WEB ? "Press Start listening, choose the meeting tab, and turn on \"Also share tab audio\"." : "Press Start listening. HireMate hears what plays through your speakers or headphones."}</p>}
+            {lines.length === 0 && <p className="text-sm text-dim">{capture !== "idle" ? "Listening… questions appear here as they're asked." : MIC_MODE ? "Press Start listening and allow the microphone. Choose your Bluetooth headset in \"Listen to\" if you use one." : IS_WEB ? "Press Start listening, choose the meeting tab, and turn on \"Also share tab audio\"." : "Press Start listening. HireMate hears what plays through your speakers or headphones."}</p>}
             {lines.map((l) => (
               <div key={l.id} className={`group rounded-xl px-3 py-2 text-sm ${l.unclear ? "border border-dashed border-amber-400/30 text-amber-100/80" : l.question ? "bg-electric/10 text-mist" : "text-haze"}`}>
                 {l.text}
@@ -503,7 +610,7 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
           </div>
         </section>
 
-        <section className="glass flex h-[60vh] flex-col rounded-3xl p-5" aria-live="polite" aria-label="Suggested answer">
+        <section className="glass order-1 flex min-h-[45vh] flex-col rounded-3xl p-4 sm:p-5 lg:order-none lg:h-[60vh]" aria-live="polite" aria-label="Suggested answer">
           <h2 className="text-sm font-semibold text-haze">{meeting ? "Suggested reply" : "Suggested answer"}</h2>
           <div className="mt-3 flex-1 space-y-3 overflow-y-auto pr-1">
             {notice && <p role="alert" className="flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2.5 text-sm text-amber-100"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {notice} Ask them to repeat it, or press "Answer this" on the line if it reads correctly.</p>}
@@ -553,6 +660,42 @@ function LiveSession({ session, onEnd }: { session: LiveInfo; onEnd: () => void 
 }
 
 const IS_WEB = typeof window !== "undefined" && window.hiremate?.platform === "web";
+/** Phones and tablets: no tab/screen sound sharing, so the session listens through a microphone. */
+const MIC_MODE = IS_WEB && !CAN_SHARE_TAB_AUDIO;
+
+/** Laptop: whether your phone has the Phone screen open, and where to open it. */
+function PhoneLinkChip({ connected }: { connected: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const url = `${window.location.origin}/#/phone`;
+  if (connected) return <span role="status" className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-emerald-200"><Smartphone className="h-4 w-4" /> Phone screen connected</span>;
+  return (
+    <button type="button" title={`On your phone, sign in and open ${url}`} onClick={() => void navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); })} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-haze hover:bg-white/[0.05] hover:text-mist">
+      <Smartphone className="h-4 w-4" /> {copied ? "Link copied" : "Phone screen: open /#/phone on your phone"}
+    </button>
+  );
+}
+
+/** Phones: which microphone is listening, and why sound might not be arriving. */
+function MicStatus({ listening, label, muted, problem }: { listening: boolean; label: string; muted: boolean; problem: string | null }) {
+  const kind = inputKind(label);
+  const Icon = kind === "bluetooth" ? Bluetooth : kind === "headset" ? Headphones : Mic;
+  return (
+    <div role="status" className="mt-3 space-y-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-haze">
+      <p className="flex flex-wrap items-center gap-2">
+        <Icon className={`h-4 w-4 ${listening && !muted ? "text-emerald-300" : "text-dim"}`} />
+        {listening ? (
+          muted ? <span className="text-amber-100">Audio unavailable: the phone paused the microphone (a call or another app is using it).</span>
+          : <span>Listening through <strong className="text-mist">{label || "the microphone"}</strong> ({KIND_LABEL[kind]})</span>
+        ) : problem ? (
+          <span className="text-amber-100">Audio unavailable: {problem}</span>
+        ) : (
+          <span>Paused. Press Start listening.</span>
+        )}
+      </p>
+      <p className="text-xs text-dim">Hears speech near this phone: in person, or a call playing on another device&apos;s speaker. A call running on this phone can&apos;t be heard (Android and iPhone keep the call&apos;s sound private). For Meet or Teams, run the meeting on your laptop and open Phone screen here.</p>
+    </div>
+  );
+}
 
 const TEST_QUESTION = "Can you tell me about your experience with REST APIs?";
 const TEST_WORDS = ["tell", "experience", "rest", "apis"];
@@ -705,7 +848,7 @@ function StatusChip({ status }: { status: Status }) {
  * and hands each segment (webm/opus) to onSegment. The screen picture is never recorded.
  */
 /** Where the meeting sound comes from. */
-export type AudioSource = "system-a" | `device:${string}`;
+export type AudioSource = "system-a" | "mic" | `device:${string}`;
 const SOURCE_KEY = "hiremate.liveAudioSource";
 const PAUSE_KEY = "hiremate.livePause";
 
@@ -723,11 +866,23 @@ const pauseToMs = (p: PauseChoice) => PAUSE_CHOICES.find((c) => c.id === p)?.ms 
 function readSource(): AudioSource {
   try {
     const v = localStorage.getItem(SOURCE_KEY);
+    if (MIC_MODE) return v?.startsWith("device:") ? (v as AudioSource) : "mic"; // phones can't share tab sound
     if (v === "system-a" || v?.startsWith("device:")) return v as AudioSource; // the old "method 2" falls back to computer sound
   } catch {
     /* storage unavailable */
   }
-  return "system-a";
+  return MIC_MODE ? "mic" : "system-a";
+}
+
+/** Phones: voice-tuned microphone (noise suppression and automatic volume help with a distant speaker). */
+const MIC_AUDIO: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+
+function micError(e: unknown): Error {
+  const name = e instanceof Error ? e.name : "";
+  if (name === "NotAllowedError" || name === "SecurityError") return new Error("Microphone permission was denied. Allow the microphone for this site (tap the lock or settings icon next to the address → Permissions → Microphone → Allow), then press Start listening.");
+  if (name === "NotFoundError" || name === "OverconstrainedError") return new Error("No microphone found. If you use a Bluetooth headset, check it's connected, or choose Phone microphone.");
+  if (name === "NotReadableError" || name === "AbortError") return new Error("The microphone is busy: another app (often a phone, Meet or Teams call on this phone) is using it.");
+  return new Error("The microphone couldn't be opened. Try again, or choose another input in Listen to.");
 }
 
 const RAW_AUDIO: MediaTrackConstraints = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
@@ -753,18 +908,28 @@ async function openSource(source: AudioSource): Promise<{ audio: MediaStreamTrac
     console.info("[live] computer sound track:", JSON.stringify(audio[0]?.getSettings() ?? {}));
     return { audio, keepAlive: stream.getVideoTracks() };
   }
+  if (source === "mic") {
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser can't use the microphone. Open the site in Chrome (Android) or Safari (iPhone).");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: MIC_AUDIO });
+      return { audio: stream.getAudioTracks(), keepAlive: [] };
+    } catch (e) {
+      throw micError(e);
+    }
+  }
   const deviceId = source.slice("device:".length);
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { deviceId: { exact: deviceId }, ...RAW_AUDIO },
+      audio: { deviceId: { exact: deviceId }, ...(MIC_MODE ? MIC_AUDIO : RAW_AUDIO) },
     });
     return { audio: stream.getAudioTracks(), keepAlive: [] };
-  } catch {
+  } catch (e) {
+    if (MIC_MODE) throw micError(e);
     throw new Error("That sound input couldn't be opened. Is it plugged in and enabled in Windows Sound settings?");
   }
 }
 
-async function startCapture(source: AudioSource, getPauseMs: () => number, onSegment: (blob: Blob, at: { startedAt: number; endedAt: number }) => void, onEnded: () => void, onLevel: (level: number) => void) {
+async function startCapture(source: AudioSource, getPauseMs: () => number, onSegment: (blob: Blob, at: { startedAt: number; endedAt: number }) => void, onEnded: () => void, onLevel: (level: number) => void, onMute?: (muted: boolean) => void) {
   // Create the audio engine while the click is still "fresh": Windows/Chromium may otherwise start it
   // paused, and a paused engine hears only silence.
   const ctx = new AudioContext();
@@ -852,7 +1017,10 @@ async function startCapture(source: AudioSource, getPauseMs: () => number, onSeg
     void ctx.close();
   };
   const ended = () => { if (!stopped) { stop(); onEnded(); } };
-  tracks[0].addEventListener("ended", ended); // sharing stopped from outside the app
+  tracks[0].addEventListener("ended", ended); // sharing stopped from outside the app, or the device went away
   videoTracks[0]?.addEventListener("ended", ended);
-  return { stop };
+  // Phones pause a microphone while a call or another app takes it.
+  tracks[0].addEventListener("mute", () => onMute?.(true));
+  tracks[0].addEventListener("unmute", () => onMute?.(false));
+  return { stop, label: tracks[0].label };
 }

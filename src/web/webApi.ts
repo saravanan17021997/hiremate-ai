@@ -13,6 +13,7 @@ import { profileSchema } from "../main/resume/schema";
 import { configProblem, supabase } from "./supabase";
 import { pickFile } from "./pickFile";
 import { closePanel, openPanel, panelBus } from "./pip";
+import { createPhoneApi } from "./phoneLink";
 
 import { APP_NAME } from "@shared/brand";
 
@@ -410,5 +411,6 @@ export function createWebApi(): HireMateApi {
       }),
       onAction: (l) => panelBus.onAction(l),
     },
+    phone: createPhoneApi(),
   };
 }

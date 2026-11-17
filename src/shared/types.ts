@@ -221,3 +221,41 @@ export interface PanelState {
 }
 
 export type PanelAction = "short" | "medium" | "detailed" | "regenerate";
+
+// ---------- Phone screen (v1.1): the laptop's live session shown on your phone ----------
+
+/** Is sound reaching the live session? */
+export type AudioState = "listening" | "paused" | "unavailable";
+
+/** What the laptop sends to the phone: the floating panel's content plus a little more. */
+export interface PhoneFeedState extends PanelState {
+  audio: AudioState;
+  audioNote: string | null; // e.g. "No meeting sound for 14 s"
+  /** The answer request this text belongs to (a new one for every question and every regenerate). */
+  requestId: string | null;
+}
+
+/** A button pressed on the phone, for the laptop to carry out. seq = the question number it was pressed for. */
+export interface PhoneRequest {
+  id: string;
+  action: PanelAction;
+  seq: number;
+  at: number;
+}
+
+/** The one live row per person (hiremate.live_feed). */
+export interface PhoneFeed {
+  active: boolean;
+  sessionId: string | null;
+  /** Grows with every laptop update; an update with a lower rev is older and is ignored. */
+  rev: number;
+  /** Question number in this session. */
+  seq: number;
+  state: PhoneFeedState | null;
+  request: PhoneRequest | null;
+  laptopSeenAt: string | null;
+  viewerSeenAt: string | null;
+}
+
+/** How the page is getting updates: instantly (realtime), by checking every second, or not at all. */
+export type FeedLink = "connecting" | "live" | "polling" | "offline";

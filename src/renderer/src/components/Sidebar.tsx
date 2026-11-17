@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { NAV } from "../lib/nav";
+import { navFor } from "../lib/nav";
 import { APP_NAME, CREDIT } from "@shared/brand";
 import { Logo } from "./Logo";
 
@@ -18,7 +18,7 @@ export function Sidebar({ collapsed, onToggle }: Props) {
     <motion.aside
       animate={{ width: collapsed ? 76 : 248 }}
       transition={{ type: "spring", stiffness: 320, damping: 34 }}
-      className="relative z-10 flex h-full shrink-0 flex-col border-r border-white/[0.06] bg-navy-950/60 backdrop-blur-xl"
+      className="relative z-10 hidden h-full shrink-0 flex-col border-r md:flex border-white/[0.06] bg-navy-950/60 backdrop-blur-xl"
     >
       <div className="drag-region flex h-16 items-center gap-3 px-5 pt-2">
         <Logo />
@@ -26,7 +26,7 @@ export function Sidebar({ collapsed, onToggle }: Props) {
       </div>
 
       <nav aria-label="Main" className="no-drag mt-4 flex flex-1 flex-col gap-1 px-3">
-        {NAV.map(({ path, label, icon: Icon }) => (
+        {navFor(window.hiremate.platform).map(({ path, label, icon: Icon }) => (
           <NavLink
             key={path}
             to={path}

@@ -1,6 +1,6 @@
 // The shape of window.hiremate, the API the preload script gives the UI.
 import type { IpcResult } from "./ipc";
-import type { JobDescription, PanelAction, PanelState, SessionRecord, Transcript, LiveConsent, LiveStart, AccountStatus, AiSettings, AnswerMode, AppInfo, AskResult, WorkspaceContextStatus, CandidateProfile, DashboardSummary, ProjectInput, ProjectList, ProviderId, ResumeImport, SavedProfile, SignUpResult, StreamEvent } from "./types";
+import type { FeedLink, JobDescription, PanelAction, PanelState, PhoneFeed, PhoneFeedState, PhoneRequest, SessionRecord, Transcript, LiveConsent, LiveStart, AccountStatus, AiSettings, AnswerMode, AppInfo, AskResult, WorkspaceContextStatus, CandidateProfile, DashboardSummary, ProjectInput, ProjectList, ProviderId, ResumeImport, SavedProfile, SignUpResult, StreamEvent } from "./types";
 
 export interface HireMateApi {
   /** "desktop" (Electron) or "web" (browser version on Vercel). A few screens differ slightly. */
@@ -84,5 +84,17 @@ export interface HireMateApi {
     /** Panel → main window. */
     act(action: PanelAction): Promise<IpcResult<boolean>>;
     onAction(listener: (action: PanelAction) => void): () => void;
+  };
+  /** Phone screen: a live session on the laptop shown on your phone. Web version only. */
+  phone: {
+    available: boolean;
+    /** Laptop → phone. The rev is added here, always growing. */
+    publish(feed: { active: boolean; sessionId: string | null; seq: number; state: PhoneFeedState | null }): Promise<IpcResult<boolean>>;
+    /** "I'm still here": the laptop's live page, or the phone screen. */
+    seen(role: "laptop" | "viewer"): Promise<IpcResult<boolean>>;
+    /** Phone → laptop: a button press. */
+    request(r: PhoneRequest): Promise<IpcResult<boolean>>;
+    /** Every change to your live row, as it happens (falls back to checking every second). */
+    watch(onFeed: (feed: PhoneFeed | null) => void, onLink: (link: FeedLink) => void): () => void;
   };
 }

@@ -38,3 +38,22 @@ export function pendingQuestion(lines: HeardLine[], maxGapMs = 2500): string | n
   const joined = `${leadIn} ${last.text}`.replace(/\s+/g, " ").trim();
   return joined.length > 1000 ? joined.slice(-1000) : joined;
 }
+
+const ADD_ON = /^(and|or|but|also|plus|like|especially|for example|for instance|in|with|on|about|using|then)\b/i;
+
+/**
+ * Is speech that starts within `limitMs` of the last question the REST of that question (a short pause cut it
+ * in two), or a NEW question? A finished question ("…Business Central?") followed by another complete question
+ * ("What is your notice period?") is a new one, and must be answered on its own straight away.
+ */
+export function continuesQuestion(previous: string, next: string, gapMs: number, limitMs = 1000): boolean {
+  if (gapMs >= limitMs) return false;
+  const p = previous.trim();
+  const t = next.trim();
+  if (ADD_ON.test(t) || !isLikelyQuestion(t)) return true;
+  // Finished: ends with "?", or is a full sentence ("Tell me about a challenging project.").
+  // A short fragment like "Can you tell me." is still waiting for its second half.
+  const finished = /\?\s*$/.test(p) || (/[.!]\s*$/.test(p) && p.split(/\s+/).length >= 5);
+  const opensNew = /\?\s*$/.test(t) || STARTS.test(t);
+  return !(finished && opensNew);
+}

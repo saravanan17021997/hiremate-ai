@@ -5,6 +5,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { beforeAll, describe, expect, it } from "vitest";
 
 const SETUP = readFileSync("supabase/hiremate_setup.sql", "utf8");
+const PHONE = readFileSync("supabase/hiremate_phone_screen.sql", "utf8"); // the v1.1 add-on for existing installs
 
 const ALICE = "11111111-1111-1111-1111-111111111111";
 const BOB = "22222222-2222-2222-2222-222222222222";
@@ -41,8 +42,10 @@ beforeAll(async () => {
     grant select on public.profiles to anon;
     insert into public.profiles (patient_name) values ('Other app row');
   `);
+  await db.exec("create publication supabase_realtime"); // exists in every Supabase project
   await db.exec(SETUP);
   await db.exec(SETUP); // safe to run twice
+  await db.exec(PHONE); // the add-on is also safe on top of a full setup
 });
 
 describe("HireMate schema and RLS", () => {
@@ -140,8 +143,22 @@ describe("HireMate schema and RLS", () => {
     expect(fns).toEqual([]);
   });
 
+  it("phone screen: each person reads and writes only their own live feed, and it is published for realtime", async () => {
+    await as(ALICE, () => db.query(`insert into hiremate.live_feed (active, rev, seq, state) values (true, 1, 1, '{"question":"Q1?"}')`));
+    await as(ALICE, () => db.query(`update hiremate.live_feed set request = '{"id":"r1","action":"medium","seq":1}', viewer_seen_at = now()`));
+    expect(await as(ALICE, () => rows("select user_id, seq, state->>'question' as q, request->>'action' as a from hiremate.live_feed"))).toEqual([{ user_id: ALICE, seq: 1, q: "Q1?", a: "medium" }]);
+    expect(await as(BOB, () => rows("select * from hiremate.live_feed"))).toEqual([]);
+    const r = await as(BOB, () => db.query(`update hiremate.live_feed set state = '{"question":"hacked"}'`));
+    expect(r.affectedRows ?? 0).toBe(0);
+    await expect(as(null, () => db.query("select * from hiremate.live_feed"))).rejects.toThrow(/permission denied/);
+    await expect(as(ALICE, () => db.query(`update hiremate.live_feed set state = '[1]'`))).rejects.toThrow(/check/);
+    expect(await rows("select tablename from pg_publication_tables where pubname = 'supabase_realtime'")).toEqual([{ tablename: "live_feed" }]);
+  });
+
   it("deleting a user removes all their data", async () => {
     await db.exec(`delete from auth.users where id = '${BOB}'`);
     expect(await rows(`select count(*)::int as n from hiremate.sessions where user_id = '${BOB}'`)).toEqual([{ n: 0 }]);
+    await db.exec(`delete from auth.users where id = '${ALICE}'`);
+    expect(await rows(`select count(*)::int as n from hiremate.live_feed`)).toEqual([{ n: 0 }]);
   });
 });

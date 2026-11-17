@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SpeechSegmenter } from "./segmenter";
-import { isLikelyQuestion, pendingQuestion } from "./questions";
+import { continuesQuestion, isLikelyQuestion, pendingQuestion } from "./questions";
 
 describe("SpeechSegmenter", () => {
   const run = (levels: number[]) => {
@@ -45,5 +45,24 @@ describe("question detection", () => {
     expect(pendingQuestion([L("Hello, hello, hello.", 0), L("What are the tools available in n8n?", 9000)])).toBe("What are the tools available in n8n?");
     // A long statement is not a lead-in.
     expect(pendingQuestion([L("We spent the whole of last quarter migrating every single workflow from the old server to the new one", 0), L("How did it go?", 2000)])).toBe("How did it go?");
+  });
+});
+
+describe("new question or the rest of the last one", () => {
+  it("joins the rest of a question that a short pause cut in two", () => {
+    expect(continuesQuestion("Can you explain how", "the REST API authentication works?", 400)).toBe(true);
+    expect(continuesQuestion("Explain your experience with REST APIs?", "Especially with Business Central.", 400)).toBe(true);
+    expect(continuesQuestion("Tell me about your last project", "and what you built in it?", 600)).toBe(true);
+  });
+  it("treats a complete question after a finished one as a NEW question", () => {
+    expect(continuesQuestion("How did you integrate Business Central?", "What is your notice period?", 300)).toBe(false);
+    expect(continuesQuestion("Explain your experience with REST APIs?", "How did you integrate Business Central?", 200)).toBe(false);
+    expect(continuesQuestion("Tell me about a challenging project.", "Why do you want to leave your current job?", 300)).toBe(false);
+  });
+  it("still joins a short fragment that Whisper ended with a full stop", () => {
+    expect(continuesQuestion("Can you tell me.", "What you did in your last role?", 300)).toBe(true);
+  });
+  it("never joins speech after the 1 second window", () => {
+    expect(continuesQuestion("Can you explain how", "the API works?", 1200)).toBe(false);
   });
 });
